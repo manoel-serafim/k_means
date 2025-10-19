@@ -20,22 +20,20 @@ static int count_rows(const char *path)
     FILE *f = fopen(path, "r");
     if (!f)
     {
-        fprintf(stderr, "Erro ao abrir %s\n", path); exit(1);
+        perror(path);
+        exit(1);
     }
-    int rows = 0; char line[8192];
+    int rows = 0;
+    char line[8192];
     while (fgets(line, sizeof(line), f))
     {
-        int only_ws = 1;
         for (char *p = line; *p; p++)
         {
             if (*p != ' ' && *p != '\t' && *p != '\n' && *p != '\r')
             {
-                only_ws = 0; break;
+                rows++;
+                break;
             }
-        }
-        if (!only_ws)
-        {
-            rows++;
         }
     }
     fclose(f);
@@ -48,50 +46,38 @@ static double *read_csv_1col(const char *path,
     int R = count_rows(path);
     if (R <= 0)
     {
-        fprintf(stderr, "Arquivo vazio: %s\n", path); exit(1);
+        fprintf(stderr, "%s: arquivo vazio\n", path);
+        exit(1);
     }
-    double *A = (double *) malloc((size_t) R * sizeof(double));
+
+    double *A = malloc((unsigned long) R * sizeof(double));
     if (!A)
     {
-        fprintf(stderr, "Sem memoria para %d linhas\n", R); exit(1);
+        perror("malloc");
+        exit(1);
     }
 
     FILE *f = fopen(path, "r");
     if (!f)
     {
-        fprintf(stderr, "Erro ao abrir %s\n", path); free(A); exit(1);
+        perror(path);
+        free(A);
+        exit(1);
     }
 
     char line[8192];
     int r = 0;
-    while (fgets(line, sizeof(line), f))
+    while (fgets(line, sizeof(line), f) && r < R)
     {
-        int only_ws = 1;
-        for (char *p = line; *p; p++)
-        {
-            if (*p != ' ' && *p != '\t' && *p != '\n' && *p != '\r')
-            {
-                only_ws = 0; break;
-            }
-        }
-        if (only_ws)
-        {
-            continue;
-        }
-
-        /* aceita vírgula/ponto-e-vírgula/espaco/tab, pega o primeiro token numérico */
-        const char *delim = ",; \t";
-        char *tok = strtok(line, delim);
+        char *tok = strtok(line, ",; \t\n\r");
         if (!tok)
         {
-            fprintf(stderr, "Linha %d sem valor em %s\n", r+1, path); free(A); fclose(f); exit(1);
+            fprintf(stderr, "%s: linha %d sem valor\n", path, r+1);
+            free(A);
+            fclose(f);
+            exit(1);
         }
-        A[r] = atof(tok);
-        r++;
-        if (r > R)
-        {
-            break;
-        }
+        A[r++] = atof(tok);
     }
     fclose(f);
     *n_out = R;
@@ -106,10 +92,12 @@ static void write_assign_csv(const char *path,
     {
         return;
     }
+
     FILE *f = fopen(path, "w");
     if (!f)
     {
-        fprintf(stderr, "Erro ao abrir %s para escrita\n", path); return;
+        perror(path);
+        return;
     }
     for (int i = 0; i < N; i++)
     {
@@ -126,10 +114,12 @@ static void write_centroids_csv(const char *path,
     {
         return;
     }
+
     FILE *f = fopen(path, "w");
     if (!f)
     {
-        fprintf(stderr, "Erro ao abrir %s para escrita\n", path); return;
+        perror(path);
+        return;
     }
     for (int c = 0; c < K; c++)
     {
@@ -139,7 +129,6 @@ static void write_centroids_csv(const char *path,
 }
 
 /* ---------- k-means 1D ---------- */
-/* assignment: para cada X[i], encontra c com menor (X[i]-C[c])^2 */
 static double assignment_step_1d(const double *X,
                                  const double *C,
                                  int *assign,
@@ -149,15 +138,15 @@ static double assignment_step_1d(const double *X,
     double sse = 0.0;
     for (int i = 0; i < N; i++)
     {
-        int best = -1;
-        double bestd = 1e300;
-        for (int c = 0; c < K; c++)
+        int best = 0;
+        double bestd = (X[i] - C[0]) * (X[i] - C[0]);
+        for (int c = 1; c < K; c++)
         {
-            double diff = X[i] - C[c];
-            double d = diff*diff;
+            double d = (X[i] - C[c]) * (X[i] - C[c]);
             if (d < bestd)
             {
-                bestd = d; best = c;
+                bestd = d;
+                best = c;
             }
         }
         assign[i] = best;
@@ -166,39 +155,34 @@ static double assignment_step_1d(const double *X,
     return sse;
 }
 
-/* update: média dos pontos de cada cluster (1D)
-   se cluster vazio, copia X[0] (estratégia naive) */
 static void update_step_1d(const double *X,
                            double *C,
                            const int *assign,
                            int N,
                            int K)
 {
-    double *sum = (double *) calloc((size_t) K, sizeof(double));
-    int *cnt = (int *) calloc((size_t) K, sizeof(int));
+    double *sum = calloc((unsigned long) K, sizeof(double));
+    int *cnt = calloc((unsigned long) K, sizeof(int));
     if (!sum || !cnt)
     {
-        fprintf(stderr, "Sem memoria no update\n"); exit(1);
+        perror("calloc");
+        exit(1);
     }
 
     for (int i = 0; i < N; i++)
     {
         int a = assign[i];
-        cnt[a] += 1;
+        cnt[a]++;
         sum[a] += X[i];
     }
+
     for (int c = 0; c < K; c++)
     {
-        if (cnt[c] > 0)
-        {
-            C[c] = sum[c] / (double) cnt[c];
-        }
-        else
-        {
-            C[c] = X[0];            /* simples: cluster vazio recebe o primeiro ponto */
-        }
+        C[c] = (cnt[c] > 0) ? sum[c] / cnt[c] : X[0];
     }
-    free(sum); free(cnt);
+
+    free(sum);
+    free(cnt);
 }
 
 static void kmeans_1d(const double *X,
@@ -214,18 +198,20 @@ static void kmeans_1d(const double *X,
     double prev_sse = 1e300;
     double sse = 0.0;
     int it;
+
     for (it = 0; it < max_iter; it++)
     {
         sse = assignment_step_1d(X, C, assign, N, K);
-        /* parada por variação relativa do SSE */
         double rel = fabs(sse - prev_sse) / (prev_sse > 0.0 ? prev_sse : 1.0);
         if (rel < eps)
         {
-            it++; break;
+            it++;
+            break;
         }
         update_step_1d(X, C, assign, N, K);
         prev_sse = sse;
     }
+
     *iters_out = it;
     *sse_out = sse;
 }
@@ -240,6 +226,7 @@ int main(int argc,
         printf("Obs: arquivos CSV com 1 coluna (1 valor por linha), sem cabeçalho.\n");
         return 1;
     }
+
     const char *pathX = argv[1];
     const char *pathC = argv[2];
     int max_iter = (argc > 3) ? atoi(argv[3]) : 50;
@@ -256,17 +243,21 @@ int main(int argc,
     int N = 0, K = 0;
     double *X = read_csv_1col(pathX, &N);
     double *C = read_csv_1col(pathC, &K);
-    int *assign = (int *) malloc((size_t) N * sizeof(int));
+    int *assign = malloc((unsigned long) N * sizeof(int));
     if (!assign)
     {
-        fprintf(stderr, "Sem memoria para assign\n"); free(X); free(C); return 1;
+        perror("malloc");
+        free(X);
+        free(C);
+        return 1;
     }
 
-    clock_t t0 = clock();
-    int iters = 0; double sse = 0.0;
+    double t0 = (double) clock();
+    int iters = 0;
+    double sse = 0.0;
     kmeans_1d(X, C, assign, N, K, max_iter, eps, &iters, &sse);
-    clock_t t1 = clock();
-    double ms = 1000.0 * (double) (t1 - t0) / (double) CLOCKS_PER_SEC;
+    double t1 = (double) clock();
+    double ms = 1000.0 * (t1 - t0) / CLOCKS_PER_SEC;
 
     printf("K-means 1D (naive)\n");
     printf("N=%d K=%d max_iter=%d eps=%g\n", N, K, max_iter, eps);
@@ -275,6 +266,8 @@ int main(int argc,
     write_assign_csv(outAssign, assign, N);
     write_centroids_csv(outCentroid, C, K);
 
-    free(assign); free(X); free(C);
+    free(assign);
+    free(X);
+    free(C);
     return 0;
 }

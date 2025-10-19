@@ -8,22 +8,22 @@ OBJ_DIR := $(BUILD_DIR)/obj
 
 SRCS := $(shell find $(SRC_DIR) -name "*.c")
 HEADERS := $(wildcard $(INC_DIR)/*.h) $(wildcard $(INC_DIR)/*/*.h)
-OBJS := $(patsubst $(SRCS), $(OBJ_DIR)/%.o, $(SRCS))
+OBJS := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
 
 CC := clang
-CFLAGS := -Wall -Wextra -Werror -pedantic -O2 -I$(INC_DIR) \
+CFLAGS := -Wall -Wextra -Werror -pedantic -O3 -I$(INC_DIR) \
           -Waddress -Warray-bounds -Wcast-align -Wconversion \
           -Wfloat-equal -Wformat -Wimplicit-function-declaration \
           -Wmissing-prototypes -Wnull-dereference -Wshadow \
           -Wsign-compare -Wstrict-aliasing -Wuninitialized \
           -Wunused-variable
 
-TARGET := sequential
+TARGET := $(BIN_DIR)/sequential
 LDFLAGS := -lm
 
 all: $(TARGET)
 
-$(BIN_DIR)/$(TARGET): $(OBJS)
+$(TARGET): $(OBJS)
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
@@ -32,7 +32,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
 # --- Code formatting with uncrustify ---
 CRUST := $(patsubst $(SRC_DIR)/%.c, $(SRC_DIR)/%.uncrustify, $(SRCS))
@@ -46,7 +46,7 @@ uncrustify: $(CRUST)
 
 ../%.uncrustify: ../%.h
 	uncrustify -c ../.uncrustify.cfg -f $< > $@
-	
+
 # --- Static analysis with cppcheck ---
 cppcheck:
 	cppcheck --force -q --check-level=exhaustive --enable=all \
