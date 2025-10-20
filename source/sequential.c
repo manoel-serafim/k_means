@@ -291,9 +291,9 @@ int main(int argc,
     double elapsed_ms = (end_time - start_time) * 1000.0;
 
     printf("K-means 1D (sequential)\n");
-    printf("N=%u K=%u max_iter=%u eps=%g threads=1\n", 
+    printf("N=%u K=%u max_iter=%u eps=%g threads=1\n",
            point_amount, centroid_amount, iteration_limit, epsilon);
-    printf("Iterações: %u | SSE final: %.10f | Tempo: %.6f ms\n", 
+    printf("Iterações: %u | SSE final: %.10f | Tempo: %.6f ms\n",
            iteration_counter, sum_squared_errors, elapsed_ms);
 
     write_assign_csv(path_assignment, assignments, point_amount);

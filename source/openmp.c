@@ -55,7 +55,8 @@ static uint32_t count_rows(const char *path)
     return rows;
 }
 
-static double *read_csv_1col(const char *path, uint32_t *n_out)
+static double *read_csv_1col(const char *path,
+                             uint32_t *n_out)
 {
     uint32_t R = count_rows(path);
     if (R <= 0)
@@ -86,7 +87,7 @@ static double *read_csv_1col(const char *path, uint32_t *n_out)
         char *tok = strtok(line, ",; \t\n\r");
         if (!tok)
         {
-            fprintf(stderr, "%s: linha %d sem valor\n", path, (int)(r+1));
+            fprintf(stderr, "%s: linha %d sem valor\n", path, (int) (r+1));
             free(A);
             fclose(f);
             exit(1);
@@ -98,7 +99,9 @@ static double *read_csv_1col(const char *path, uint32_t *n_out)
     return A;
 }
 
-static void write_assign_csv(const char *path, const uint32_t *assign, uint32_t N)
+static void write_assign_csv(const char *path,
+                             const uint32_t *assign,
+                             uint32_t N)
 {
     if (!path)
     {
@@ -118,7 +121,9 @@ static void write_assign_csv(const char *path, const uint32_t *assign, uint32_t 
     fclose(f);
 }
 
-static void write_centroids_csv(const char *path, const double *C, uint32_t K)
+static void write_centroids_csv(const char *path,
+                                const double *C,
+                                uint32_t K)
 {
     if (!path)
     {
@@ -138,60 +143,56 @@ static void write_centroids_csv(const char *path, const double *C, uint32_t K)
     fclose(f);
 }
 
-/* Assignment step paralelo com reduction do SSE */
 static void assignment_step_1d(void)
 {
     float64_t local_sse = 0.0;
-    
+
     #pragma omp parallel for reduction(+:local_sse) schedule(static)
     for (uint32_t point_index = 0; point_index < point_amount; ++point_index)
     {
         uint32_t best_centroid = 0;
         float64_t error = points[point_index] - centroids[0];
         float64_t min_squared_error = error * error;
-        
-        /* Encontrar centróide mais próximo */
+
         for (uint32_t centroid_index = 1; centroid_index < centroid_amount; ++centroid_index)
         {
             error = points[point_index] - centroids[centroid_index];
             float64_t squared_error = error * error;
-            
+
             if (squared_error < min_squared_error)
             {
                 min_squared_error = squared_error;
                 best_centroid = centroid_index;
             }
         }
-        
+
         assignments[point_index] = best_centroid;
         local_sse += min_squared_error;
     }
-    
+
     sum_squared_errors = local_sse;
 }
 
 /* Update step paralelo com acumuladores por thread (Opção A) */
 static void update_step_1d(void)
 {
-    uint32_t num_threads = (uint32_t)omp_get_max_threads();
-    
-    /* Alocar arrays temporários para cada thread */
-    float64_t *thread_sums = calloc((size_t)(num_threads * centroid_amount), sizeof(float64_t));
-    uint32_t *thread_counts = calloc((size_t)(num_threads * centroid_amount), sizeof(uint32_t));
-    
+    uint32_t num_threads = (uint32_t) omp_get_max_threads();
+
+    float64_t *thread_sums = calloc((size_t) (num_threads * centroid_amount), sizeof(float64_t));
+    uint32_t *thread_counts = calloc((size_t) (num_threads * centroid_amount), sizeof(uint32_t));
+
     if (!thread_sums || !thread_counts)
     {
         perror("calloc thread arrays");
         exit(1);
     }
-    
-    /* Fase 1: Acumulação paralela (cada thread acumula em seu próprio espaço) */
+
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
-        float64_t *my_sums = &thread_sums[(uint32_t)tid * centroid_amount];
-        uint32_t *my_counts = &thread_counts[(uint32_t)tid * centroid_amount];
-        
+        float64_t *my_sums = &thread_sums[(uint32_t) tid * centroid_amount];
+        uint32_t *my_counts = &thread_counts[(uint32_t) tid * centroid_amount];
+
         #pragma omp for schedule(static)
         for (uint32_t point_index = 0; point_index < point_amount; ++point_index)
         {
@@ -200,11 +201,10 @@ static void update_step_1d(void)
             my_sums[centroid_index] += points[point_index];
         }
     }
-    
-    /* Fase 2: Redução sequencial dos acumuladores */
+
     memset(sum_centroid_points, 0, centroid_amount * sizeof(float64_t));
     memset(amount_centroid_points, 0, centroid_amount * sizeof(uint32_t));
-    
+
     for (uint32_t t = 0; t < num_threads; ++t)
     {
         for (uint32_t c = 0; c < centroid_amount; ++c)
@@ -213,22 +213,20 @@ static void update_step_1d(void)
             amount_centroid_points[c] += thread_counts[t * centroid_amount + c];
         }
     }
-    
-    /* Fase 3: Cálculo paralelo dos novos centróides */
+
     #pragma omp parallel for schedule(static)
     for (uint32_t c = 0; c < centroid_amount; ++c)
     {
         if (amount_centroid_points[c] > 0)
         {
-            centroids[c] = sum_centroid_points[c] / (float64_t)amount_centroid_points[c];
+            centroids[c] = sum_centroid_points[c] / (float64_t) amount_centroid_points[c];
         }
         else
         {
-            /* Cluster vazio: copiar primeiro ponto */
             centroids[c] = points[0];
         }
     }
-    
+
     free(thread_sums);
     free(thread_counts);
 }
@@ -250,7 +248,7 @@ static void kmeans_1d(void)
     {
         assignment_step_1d();
         relative_change = fabs(sum_squared_errors - sse_holder) / (sse_holder > 0.0 ? sse_holder : 1.0);
-        
+
         if (relative_change < epsilon)
         {
             ++iteration_counter;
@@ -262,12 +260,13 @@ static void kmeans_1d(void)
             sse_holder = sum_squared_errors;
         }
     }
-    
+
     free(sum_centroid_points);
     free(amount_centroid_points);
 }
 
-int main(int argc, char **argv)
+int main(int argc,
+         char **argv)
 {
     if (argc < 3)
     {
@@ -306,16 +305,16 @@ int main(int argc, char **argv)
 
     /* Medição de tempo com OpenMP */
     double start_time = omp_get_wtime();
-    
+
     kmeans_1d();
-    
+
     double end_time = omp_get_wtime();
     double elapsed_ms = (end_time - start_time) * 1000.0;
 
     printf("K-means 1D (OpenMP)\n");
-    printf("N=%u K=%u max_iter=%u eps=%g threads=%d\n", 
+    printf("N=%u K=%u max_iter=%u eps=%g threads=%d\n",
            point_amount, centroid_amount, iteration_limit, epsilon, num_threads);
-    printf("Iterações: %u | SSE final: %.10f | Tempo: %.3f ms\n", 
+    printf("Iterações: %u | SSE final: %.10f | Tempo: %.3f ms\n",
            iteration_counter, sum_squared_errors, elapsed_ms);
 
     write_assign_csv(path_assignment, assignments, point_amount);

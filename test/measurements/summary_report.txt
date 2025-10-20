@@ -12,26 +12,26 @@ SEQUENTIAL RUN CONSOLIDATION
 
 0_0:
   Runs: 20
-  Time - Median: 0.010014ms, Mean: 0.058079ms, Std: 0.201660ms
-  Time - Min: 0.007153ms, Max: 0.913143ms
+  Time - Median: 0.004530ms, Mean: 0.020385ms, Std: 0.071412ms
+  Time - Min: 0.003099ms, Max: 0.323772ms
   SSE - Mean: 344.8750000000, Std: 0.00e+00
 
 large_large:
   Runs: 20
-  Time - Median: 51.390529ms, Mean: 54.950786ms, Std: 7.177091ms
-  Time - Min: 49.190044ms, Max: 76.150179ms
+  Time - Median: 27.035475ms, Mean: 27.269733ms, Std: 0.791648ms
+  Time - Min: 26.466846ms, Max: 29.670954ms
   SSE - Mean: 2238427.8068446615, Std: 0.00e+00
 
 medium_medium:
   Runs: 20
-  Time - Median: 2.804041ms, Mean: 3.148174ms, Std: 0.658222ms
-  Time - Min: 2.688885ms, Max: 5.244017ms
+  Time - Median: 1.721501ms, Mean: 1.916563ms, Std: 0.424397ms
+  Time - Min: 1.497984ms, Max: 2.797127ms
   SSE - Mean: 99907.2920512084, Std: 0.00e+00
 
 small_small:
   Runs: 20
-  Time - Median: 0.294447ms, Mean: 0.304234ms, Std: 0.050182ms
-  Time - Min: 0.248909ms, Max: 0.440121ms
+  Time - Median: 0.159978ms, Mean: 0.176918ms, Std: 0.078765ms
+  Time - Min: 0.111103ms, Max: 0.348806ms
   SSE - Mean: 6439.6959026865, Std: 0.00e+00
 
 
@@ -55,14 +55,14 @@ SSE VALIDATION:
 PERFORMANCE METRICS:
 Threads    Time (ms)       Speedup      Efficiency (%) 
 ------------------------------------------------------------
-1 (Seq)    0.010014        1.00         100.00         
-1          3.537000        0.00         0.28           
-2          4.635000        0.00         0.11           
-4          4.616000        0.00         0.05           
-8          61.787000       0.00         0.00           
-16         96.927000       0.00         0.00           
+1 (Seq)    0.004530        1.00         100.00         
+1          1.483000        0.00         0.31           
+2          2.369000        0.00         0.10           
+4          2.667000        0.00         0.04           
+8          21.235000       0.00         0.00           
+16         101.555000      0.00         0.00           
 
-Best speedup: 0.00x with 1 threads (efficiency: 0.28%)
+Best speedup: 0.00x with 1 threads (efficiency: 0.31%)
 
 ================================================================================
 TEST: large_large
@@ -84,14 +84,14 @@ SSE VALIDATION:
 PERFORMANCE METRICS:
 Threads    Time (ms)       Speedup      Efficiency (%) 
 ------------------------------------------------------------
-1 (Seq)    51.390529       1.00         100.00         
-1          50.351000       1.02         102.06         
-2          41.496000       1.24         61.92          
-4          41.324000       1.24         31.09          
-8          96.348000       0.53         6.67           
-16         89.430000       0.57         3.59           
+1 (Seq)    27.035475       1.00         100.00         
+1          28.887000       0.94         93.59          
+2          15.689000       1.72         86.16          
+4          17.158000       1.58         39.39          
+8          7.614000        3.55         44.38          
+16         27.246000       0.99         6.20           
 
-Best speedup: 1.24x with 4 threads (efficiency: 31.09%)
+Best speedup: 3.55x with 8 threads (efficiency: 44.38%)
 
 ================================================================================
 TEST: medium_medium
@@ -113,14 +113,14 @@ SSE VALIDATION:
 PERFORMANCE METRICS:
 Threads    Time (ms)       Speedup      Efficiency (%) 
 ------------------------------------------------------------
-1 (Seq)    2.804041        1.00         100.00         
-1          4.251000        0.66         65.96          
-2          6.458000        0.43         21.71          
-4          37.624000       0.07         1.86           
-8          17.776000       0.16         1.97           
-16         150.502000      0.02         0.12           
+1 (Seq)    1.721501        1.00         100.00         
+1          4.260000        0.40         40.41          
+2          3.112000        0.55         27.66          
+4          36.952000       0.05         1.16           
+8          41.513000       0.04         0.52           
+16         84.893000       0.02         0.13           
 
-Best speedup: 0.66x with 1 threads (efficiency: 65.96%)
+Best speedup: 0.55x with 2 threads (efficiency: 27.66%)
 
 ================================================================================
 TEST: small_small
@@ -142,14 +142,14 @@ SSE VALIDATION:
 PERFORMANCE METRICS:
 Threads    Time (ms)       Speedup      Efficiency (%) 
 ------------------------------------------------------------
-1 (Seq)    0.294447        1.00         100.00         
-1          5.676000        0.05         5.19           
-2          6.032000        0.05         2.44           
-4          5.899000        0.05         1.25           
-8          120.790000      0.00         0.03           
-16         18.210000       0.02         0.10           
+1 (Seq)    0.159978        1.00         100.00         
+1          1.267000        0.13         12.63          
+2          2.022000        0.08         3.96           
+4          2.948000        0.05         1.36           
+8          3.064000        0.05         0.65           
+16         4.208000        0.04         0.24           
 
-Best speedup: 0.05x with 1 threads (efficiency: 5.19%)
+Best speedup: 0.13x with 1 threads (efficiency: 12.63%)
 
 ================================================================================
 END OF REPORT

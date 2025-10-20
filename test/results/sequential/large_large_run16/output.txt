@@ -1,3 +1,3 @@
 K-means 1D (sequential)
 N=1000000 K=16 max_iter=50 eps=1e-06 threads=1
-Iterações: 3 | SSE final: 2238427.8068446615 | Tempo: 58.553934 ms
+Iterações: 3 | SSE final: 2238427.8068446615 | Tempo: 27.460814 ms
