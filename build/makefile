@@ -4,6 +4,7 @@ BUILD_DIR := .
 HEAD_DIR := ..
 BIN_DIR := $(BUILD_DIR)/bin
 OBJ_DIR := $(BUILD_DIR)/obj
+TEST_DIR := ../test
 
 
 SRCS := $(shell find $(SRC_DIR) -name "*.c")
@@ -34,7 +35,6 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
-# --- Code formatting with uncrustify ---
 CRUST := $(patsubst $(SRC_DIR)/%.c, $(SRC_DIR)/%.uncrustify, $(SRCS))
 CRUST += $(patsubst $(INC_DIR)/%.h, $(INC_DIR)/%.uncrustify, $(HEADERS))
 
@@ -47,10 +47,29 @@ uncrustify: $(CRUST)
 ../%.uncrustify: ../%.h
 	uncrustify -c ../.uncrustify.cfg -f $< > $@
 
-# --- Static analysis with cppcheck ---
 cppcheck:
 	cppcheck --force -q --check-level=exhaustive --enable=all \
 		$(SRCS) $(HEADERS) -I $(INC_DIR) \
 		--checkers-report=cppcheck_report.xml
 
-.PHONY: all clean uncrustify cppcheck
+test: $(TARGET)
+	@echo "Running K-means tests..."
+	@mkdir -p $(TEST_DIR)/results
+	@for point_file in $(TEST_DIR)/point/*; do \
+		point_name=$(basename $point_file .txt); \
+		for centroid_file in $(TEST_DIR)/centroid/*; do \
+			centroid_name=$(basename $centroid_file .txt); \
+			result_dir=$(TEST_DIR)/results/${point_name}_${centroid_name}; \
+			mkdir -p $result_dir; \
+			echo "Test ${point_name}_${centroid_name}: points=$point_file centroids=$centroid_file"; \
+			$(TARGET) $point_file \
+			          $centroid_file \
+			          50 \
+			          0.000001 \
+			          $result_dir/assign.txt \
+			          $result_dir/centroids.txt; \
+		done; \
+	done
+	@echo "All tests completed!"
+
+.PHONY: all clean uncrustify cppcheck test

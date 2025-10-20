@@ -25,8 +25,8 @@ float64_t epsilon = 0.0f;
 
 const float64_t *points = NULL;
 float64_t *centroids = NULL;
-float64_t * sum_centroid_points = NULL;
-uint32_t * amount_centroid_points = NULL;
+float64_t *sum_centroid_points = NULL;
+uint32_t *amount_centroid_points = NULL;
 uint32_t *assignments = NULL;
 
 /* ---------- util CSV 1D: cada linha tem 1 número ---------- */
@@ -161,26 +161,28 @@ static void assignment_step_1d(void)
         assign_index = 0u;
         error = (points[point_index]-centroids[0]); // compiler would already optimize for reuse under -O2
         squared_error = error * error;
-        
+
         centroid_index = 1u;
         do
         {
-            
+
             error = (points[point_index]-centroids[centroid_index]);
             squared_error_holder = error*error;
-            if(squared_error > squared_error_holder )
+            if (squared_error > squared_error_holder)
             {
                 squared_error = squared_error_holder;
                 assign_index = centroid_index;
             }
             ++centroid_index;
 
-        }while(centroid_index < centroid_amount);
+        }
+        while (centroid_index < centroid_amount);
 
         assignments[point_index] = assign_index;
         sum_squared_errors += squared_error;
         ++point_index;
-    }while(point_index < point_amount);
+    }
+    while (point_index < point_amount);
 
 }
 
@@ -198,16 +200,18 @@ static void update_step_1d(void)
         amount_centroid_points[centroid_index]++;
         sum_centroid_points[centroid_index] += points[point_index];
         ++point_index;
-    }while(point_index < point_amount);
+    }
+    while (point_index < point_amount);
 
     centroid_index = 0u;
-    do 
+    do
     {
         centroids[centroid_index] = (amount_centroid_points[centroid_index] > 0) ? (sum_centroid_points[centroid_index] / amount_centroid_points[centroid_index]) : points[0];
         ++centroid_index;
-    }while(centroid_index < centroid_amount);
+    }
+    while (centroid_index < centroid_amount);
 
- 
+
 }
 
 static void kmeans_1d(void)
@@ -237,7 +241,7 @@ static void kmeans_1d(void)
             update_step_1d();
             sse_holder = sum_squared_errors;
         }
-        
+
     }
     free(sum_centroid_points);
     free(amount_centroid_points);
@@ -255,7 +259,7 @@ int main(int argc,
 
     const char *const path_points = argv[1];
     const char *const path_centroids = argv[2];
-    iteration_limit = (argc > 3) ? (uint32_t)atoi(argv[3]) : 50u;
+    iteration_limit = (argc > 3) ? (uint32_t) atoi(argv[3]) : 50u;
     epsilon = (argc > 4) ? atof(argv[4]) : 1e-4;
     const char *path_assignment = (argc > 5) ? argv[5] : NULL;
     const char *path_output_centroid = (argc > 6) ? argv[6] : NULL;
@@ -266,32 +270,32 @@ int main(int argc,
         return 1;
     }
 
-    
+
     points = read_csv_1col(path_points, &point_amount);
     centroids = read_csv_1col(path_centroids, &centroid_amount);
-    assignments = malloc((size_t)point_amount * sizeof(uint32_t));
+    assignments = malloc((size_t) point_amount * sizeof(uint32_t));
     if (!assignments)
     {
         perror("malloc");
         free(centroids);
-        free((void*)points);
+        free((void *) points);
         return 1;
     }
 
 
-   int64_t ns = 0;
+    int64_t ns = 0;
 
 #ifdef HAS_CLOCK_GETTIME
     struct timespec start_time_measure, end_time_measure;
     clock_gettime(CLOCK_MONOTONIC, &start_time_measure);
 #endif
-   
+
     kmeans_1d();
-    
+
 #ifdef HAS_CLOCK_GETTIME
     clock_gettime(CLOCK_MONOTONIC, &end_time_measure);
-    ns = (int64_t)(end_time_measure.tv_sec - start_time_measure.tv_sec) * 1000000000LL + 
-         (int64_t)(end_time_measure.tv_nsec - start_time_measure.tv_nsec);
+    ns = (int64_t) (end_time_measure.tv_sec - start_time_measure.tv_sec) * 1000000000LL +
+         (int64_t) (end_time_measure.tv_nsec - start_time_measure.tv_nsec);
 #endif
 
     printf("K-means 1D (naive)\n");
@@ -303,6 +307,6 @@ int main(int argc,
 
     free(assignments);
     free(centroids);
-    free((void*)points);
+    free((void *) points);
     return 0;
 }
