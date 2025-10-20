@@ -13,9 +13,24 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "types.h"
+
+
+uint32_t point_amount = 0u;
+uint32_t centroid_amount = 0u;
+uint32_t iteration_counter = 0u;
+uint32_t iteration_limit = 0u;
+float64_t sum_squared_errors = 0.0f;
+float64_t epsilon = 0.0f;
+
+const float64_t *points = NULL;
+float64_t *centroids = NULL;
+float64_t * sum_centroid_points = NULL;
+uint32_t * amount_centroid_points = NULL;
+uint32_t *assignments = NULL;
 
 /* ---------- util CSV 1D: cada linha tem 1 número ---------- */
-static int count_rows(const char *path)
+static uint32_t count_rows(const char *path)
 {
     FILE *f = fopen(path, "r");
     if (!f)
@@ -23,7 +38,7 @@ static int count_rows(const char *path)
         perror(path);
         exit(1);
     }
-    int rows = 0;
+    uint32_t rows = 0;
     char line[8192];
     while (fgets(line, sizeof(line), f))
     {
@@ -41,9 +56,9 @@ static int count_rows(const char *path)
 }
 
 static double *read_csv_1col(const char *path,
-                             int *n_out)
+                             uint32_t *n_out)
 {
-    int R = count_rows(path);
+    uint32_t R = count_rows(path);
     if (R <= 0)
     {
         fprintf(stderr, "%s: arquivo vazio\n", path);
@@ -66,7 +81,7 @@ static double *read_csv_1col(const char *path,
     }
 
     char line[8192];
-    int r = 0;
+    uint32_t r = 0;
     while (fgets(line, sizeof(line), f) && r < R)
     {
         char *tok = strtok(line, ",; \t\n\r");
@@ -85,8 +100,8 @@ static double *read_csv_1col(const char *path,
 }
 
 static void write_assign_csv(const char *path,
-                             const int *assign,
-                             int N)
+                             const uint32_t *assign,
+                             uint32_t N)
 {
     if (!path)
     {
@@ -99,7 +114,7 @@ static void write_assign_csv(const char *path,
         perror(path);
         return;
     }
-    for (int i = 0; i < N; i++)
+    for (uint32_t i = 0; i < N; i++)
     {
         fprintf(f, "%d\n", assign[i]);
     }
@@ -108,7 +123,7 @@ static void write_assign_csv(const char *path,
 
 static void write_centroids_csv(const char *path,
                                 const double *C,
-                                int K)
+                                uint32_t K)
 {
     if (!path)
     {
@@ -121,102 +136,113 @@ static void write_centroids_csv(const char *path,
         perror(path);
         return;
     }
-    for (int c = 0; c < K; c++)
+    for (uint32_t c = 0; c < K; c++)
     {
         fprintf(f, "%.6f\n", C[c]);
     }
     fclose(f);
 }
 
-/* ---------- k-means 1D ---------- */
-static double assignment_step_1d(const double *X,
-                                 const double *C,
-                                 int *assign,
-                                 int N,
-                                 int K)
+static void assignment_step_1d(void)
 {
-    double sse = 0.0;
-    for (int i = 0; i < N; i++)
+    uint32_t point_index = 0u;
+    uint32_t centroid_index = 0u;
+
+    uint32_t assign_index = 0u;
+
+    float64_t error = 0.0f;
+    float64_t squared_error = 0.0f;
+    float64_t squared_error_holder = 0.0f;
+    sum_squared_errors = 0.0f;
+
+    point_index = 0u;
+    do
     {
-        int best = 0;
-        double bestd = (X[i] - C[0]) * (X[i] - C[0]);
-        for (int c = 1; c < K; c++)
+        assign_index = 0u;
+        error = (points[point_index]-centroids[0]); // compiler would already optimize for reuse under -O2
+        squared_error = error * error;
+        
+        centroid_index = 1u;
+        do
         {
-            double d = (X[i] - C[c]) * (X[i] - C[c]);
-            if (d < bestd)
+            
+            error = (points[point_index]-centroids[centroid_index]);
+            squared_error_holder = error*error;
+            if(squared_error > squared_error_holder )
             {
-                bestd = d;
-                best = c;
+                squared_error = squared_error_holder;
+                assign_index = centroid_index;
             }
-        }
-        assign[i] = best;
-        sse += bestd;
-    }
-    return sse;
+            ++centroid_index;
+
+        }while(centroid_index < centroid_amount);
+
+        assignments[point_index] = assign_index;
+        sum_squared_errors += squared_error;
+        ++point_index;
+    }while(point_index < point_amount);
+
 }
 
-static void update_step_1d(const double *X,
-                           double *C,
-                           const int *assign,
-                           int N,
-                           int K)
+static void update_step_1d(void)
 {
-    double *sum = calloc((unsigned long) K, sizeof(double));
-    int *cnt = calloc((unsigned long) K, sizeof(int));
-    if (!sum || !cnt)
+
+    memset(sum_centroid_points, 0.0f, centroid_amount*sizeof(float64_t));
+    memset(amount_centroid_points, 0u, centroid_amount*sizeof(uint32_t));
+
+    uint32_t point_index = 0u;
+    uint32_t centroid_index = 0u;
+    do
+    {
+        centroid_index = assignments[point_index];
+        amount_centroid_points[centroid_index]++;
+        sum_centroid_points[centroid_index] += points[point_index];
+        ++point_index;
+    }while(point_index < point_amount);
+
+    centroid_index = 0u;
+    do 
+    {
+        centroids[centroid_index] = (amount_centroid_points[centroid_index] > 0) ? (sum_centroid_points[centroid_index] / amount_centroid_points[centroid_index]) : points[0];
+        ++centroid_index;
+    }while(centroid_index < centroid_amount);
+
+ 
+}
+
+static void kmeans_1d(void)
+{
+    float64_t sse_holder = 1e300;
+    float64_t relative_change = 0.0f;
+
+    sum_centroid_points = calloc((size_t) centroid_amount, sizeof(float64_t));
+    amount_centroid_points = calloc((size_t) centroid_amount, sizeof(uint32_t));
+    if (!sum_centroid_points || !amount_centroid_points)
     {
         perror("calloc");
         exit(1);
     }
 
-    for (int i = 0; i < N; i++)
+    for (iteration_counter = 0; iteration_counter < iteration_limit; ++iteration_counter)
     {
-        int a = assign[i];
-        cnt[a]++;
-        sum[a] += X[i];
-    }
-
-    for (int c = 0; c < K; c++)
-    {
-        C[c] = (cnt[c] > 0) ? sum[c] / cnt[c] : X[0];
-    }
-
-    free(sum);
-    free(cnt);
-}
-
-static void kmeans_1d(const double *X,
-                      double *C,
-                      int *assign,
-                      int N,
-                      int K,
-                      int max_iter,
-                      double eps,
-                      int *iters_out,
-                      double *sse_out)
-{
-    double prev_sse = 1e300;
-    double sse = 0.0;
-    int it;
-
-    for (it = 0; it < max_iter; it++)
-    {
-        sse = assignment_step_1d(X, C, assign, N, K);
-        double rel = fabs(sse - prev_sse) / (prev_sse > 0.0 ? prev_sse : 1.0);
-        if (rel < eps)
+        assignment_step_1d();
+        relative_change = fabs(sum_squared_errors - sse_holder) / (sse_holder > 0.0 ? sse_holder : 1.0);
+        if (relative_change < epsilon)
         {
-            it++;
+            ++iteration_counter;
             break;
         }
-        update_step_1d(X, C, assign, N, K);
-        prev_sse = sse;
+        else
+        {
+            update_step_1d();
+            sse_holder = sum_squared_errors;
+        }
+        
     }
-
-    *iters_out = it;
-    *sse_out = sse;
+    free(sum_centroid_points);
+    free(amount_centroid_points);
 }
 
-/* ---------- main ---------- */
 int main(int argc,
          char **argv)
 {
@@ -227,47 +253,56 @@ int main(int argc,
         return 1;
     }
 
-    const char *pathX = argv[1];
-    const char *pathC = argv[2];
-    int max_iter = (argc > 3) ? atoi(argv[3]) : 50;
-    double eps = (argc > 4) ? atof(argv[4]) : 1e-4;
-    const char *outAssign = (argc > 5) ? argv[5] : NULL;
-    const char *outCentroid = (argc > 6) ? argv[6] : NULL;
+    const char *const path_points = argv[1];
+    const char *const path_centroids = argv[2];
+    iteration_limit = (argc > 3) ? (uint32_t)atoi(argv[3]) : 50u;
+    epsilon = (argc > 4) ? atof(argv[4]) : 1e-4;
+    const char *path_assignment = (argc > 5) ? argv[5] : NULL;
+    const char *path_output_centroid = (argc > 6) ? argv[6] : NULL;
 
-    if (max_iter <= 0 || eps <= 0.0)
+    if (iteration_limit <= 0 || epsilon <= 0.0)
     {
-        fprintf(stderr, "Parâmetros inválidos: max_iter>0 e eps>0\n");
+        fprintf(stderr, "max_iter>0 e eps>0\n");
         return 1;
     }
 
-    int N = 0, K = 0;
-    double *X = read_csv_1col(pathX, &N);
-    double *C = read_csv_1col(pathC, &K);
-    int *assign = malloc((unsigned long) N * sizeof(int));
-    if (!assign)
+    
+    points = read_csv_1col(path_points, &point_amount);
+    centroids = read_csv_1col(path_centroids, &centroid_amount);
+    assignments = malloc((size_t)point_amount * sizeof(uint32_t));
+    if (!assignments)
     {
         perror("malloc");
-        free(X);
-        free(C);
+        free(centroids);
+        free((void*)points);
         return 1;
     }
 
-    double t0 = (double) clock();
-    int iters = 0;
-    double sse = 0.0;
-    kmeans_1d(X, C, assign, N, K, max_iter, eps, &iters, &sse);
-    double t1 = (double) clock();
-    double ms = 1000.0 * (t1 - t0) / CLOCKS_PER_SEC;
+
+   int64_t ns = 0;
+
+#ifdef HAS_CLOCK_GETTIME
+    struct timespec start_time_measure, end_time_measure;
+    clock_gettime(CLOCK_MONOTONIC, &start_time_measure);
+#endif
+   
+    kmeans_1d();
+    
+#ifdef HAS_CLOCK_GETTIME
+    clock_gettime(CLOCK_MONOTONIC, &end_time_measure);
+    ns = (int64_t)(end_time_measure.tv_sec - start_time_measure.tv_sec) * 1000000000LL + 
+         (int64_t)(end_time_measure.tv_nsec - start_time_measure.tv_nsec);
+#endif
 
     printf("K-means 1D (naive)\n");
-    printf("N=%d K=%d max_iter=%d eps=%g\n", N, K, max_iter, eps);
-    printf("Iterações: %d | SSE final: %.6f | Tempo: %.1f ms\n", iters, sse, ms);
+    printf("N=%d K=%d max_iter=%d eps=%g\n", point_amount, centroid_amount, iteration_limit, epsilon);
+    printf("Iterações: %d | SSE final: %.10f | Tempo: %ld ns\n", iteration_counter, sum_squared_errors, ns);
 
-    write_assign_csv(outAssign, assign, N);
-    write_centroids_csv(outCentroid, C, K);
+    write_assign_csv(path_assignment, assignments, point_amount);
+    write_centroids_csv(path_output_centroid, centroids, centroid_amount);
 
-    free(assign);
-    free(X);
-    free(C);
+    free(assignments);
+    free(centroids);
+    free((void*)points);
     return 0;
 }

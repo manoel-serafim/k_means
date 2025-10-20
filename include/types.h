@@ -16,5 +16,6 @@
 
 typedef int int32_t;
 typedef unsigned int uint32_t;
+typedef double float64_t;
 
 #endif // STD_TYPES_H_
