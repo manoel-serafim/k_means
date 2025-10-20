@@ -29,4 +29,4 @@ python test/evaluate.py
 
 ## Resultados
 
-Os resultados são salvos em `test/measurements` incluindo métricas de desempenho, logs de execução e gráficos de visualização. A estrutura separa medições sequenciais e OpenMP, com cada configuração mantendo arquivos de atribuições de clusters, centroides finais e estatísticas de execução. Relatórios consolidados facilitam a comparação entre experimentos.
+Os resultados são salvos em `test/measurements` incluindo métricas de desempenho, logs de execução e gráficos de visualização. A estrutura separa medições sequenciais e OpenMP, com cada configuração mantendo arquivos de atribuições de clusters, centroides finais e estatísticas de execução.
