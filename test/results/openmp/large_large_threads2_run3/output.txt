@@ -1,0 +1,3 @@
+K-means 1D (OpenMP)
+N=1000000 K=16 max_iter=50 eps=1e-06 threads=2
+Iterações: 3 | SSE final: 2238427.8068447229 | Tempo: 41.744 ms

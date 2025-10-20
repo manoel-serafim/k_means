@@ -13,6 +13,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <omp.h> //only for timing
 #include "types.h"
 
 
@@ -282,25 +283,18 @@ int main(int argc,
         return 1;
     }
 
-
-    int64_t ns = 0;
-
-#ifdef HAS_CLOCK_GETTIME
-    struct timespec start_time_measure, end_time_measure;
-    clock_gettime(CLOCK_MONOTONIC, &start_time_measure);
-#endif
+    double start_time = omp_get_wtime();
 
     kmeans_1d();
 
-#ifdef HAS_CLOCK_GETTIME
-    clock_gettime(CLOCK_MONOTONIC, &end_time_measure);
-    ns = (int64_t) (end_time_measure.tv_sec - start_time_measure.tv_sec) * 1000000000LL +
-         (int64_t) (end_time_measure.tv_nsec - start_time_measure.tv_nsec);
-#endif
+    double end_time = omp_get_wtime();
+    double elapsed_ms = (end_time - start_time) * 1000.0;
 
-    printf("K-means 1D (naive)\n");
-    printf("N=%d K=%d max_iter=%d eps=%g\n", point_amount, centroid_amount, iteration_limit, epsilon);
-    printf("Iterações: %d | SSE final: %.10f | Tempo: %ld ns\n", iteration_counter, sum_squared_errors, ns);
+    printf("K-means 1D (sequential)\n");
+    printf("N=%u K=%u max_iter=%u eps=%g threads=1\n", 
+           point_amount, centroid_amount, iteration_limit, epsilon);
+    printf("Iterações: %u | SSE final: %.10f | Tempo: %.6f ms\n", 
+           iteration_counter, sum_squared_errors, elapsed_ms);
 
     write_assign_csv(path_assignment, assignments, point_amount);
     write_centroids_csv(path_output_centroid, centroids, centroid_amount);
