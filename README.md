@@ -1,6 +1,6 @@
 # Implementação K-Means
 
-Este repositório contém uma implementação paralela do algoritmo de clusterização K-Means com versões sequencial e paralela usando OpenMP, projetada para análise de desempenho em diferentes configurações de threads.
+Este repositório contém uma implementação paralela do algoritmo de clusterização K-Means com versões sequencial e paralela usando OpenMP e CUDA projetada para análise de desempenho em diferentes configurações. A implementação dos testes levou em conta que a magnitude dos pontos também deveria ter variância significativa para que o número de iterações computadas fosse grande o suficiente.
 
 ## Requisitos
 
@@ -13,7 +13,7 @@ Para compilar o projeto execute:
 clear && make clean && make
 ```
 
-Os executáveis são gerados em `build/bin`: versão sequencial para baseline e versão OpenMP com suporte a múltiplas threads.
+Os executáveis são gerados em `build/bin`: versão sequencial para baseline e versão OpenMP.
 
 ## Testes e Avaliação
 Nessa mesma pasta
