@@ -1,6 +1,8 @@
 # Implementação K-Means
 
-Este repositório contém uma implementação paralela do algoritmo de clusterização K-Means com versões sequencial e paralela usando OpenMP e CUDA projetada para análise de desempenho em diferentes configurações. A implementação dos testes levou em conta que a magnitude dos pontos também deveria ter variância significativa para que o número de iterações computadas fosse grande o suficiente.
+[!] As implementações em CUDA e MPI podem ser facilmente reexecutadas através dos .ipynb disponíveis nesse repositório.
+
+Este repositório contém uma implementação paralela do algoritmo de clusterização K-Means com versões sequencial e paralela usando OpenMP e CUDA projetada para análise de desempenho em diferentes configurações. A implementação dos testes levou em conta que a magnitude dos pontos também deveria ter variância significativa para que o número de iterações computadas fosse grande o suficiente. 
 
 ## Requisitos
 

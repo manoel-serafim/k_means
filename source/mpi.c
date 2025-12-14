@@ -15,7 +15,6 @@ float64_t epsilon = 0.0f;
 float64_t *points_global = NULL;
 uint32_t *assignments_global = NULL;
 
-uint32_t local_point_start = 0u;
 uint32_t local_point_count = 0u;
 float64_t *points_local = NULL;
 uint32_t *assignments_local = NULL;
@@ -26,6 +25,9 @@ float64_t *sum_centroid_points_local = NULL;
 uint32_t *amount_centroid_points_local = NULL;
 float64_t *sum_centroid_points_global = NULL;
 uint32_t *amount_centroid_points_global = NULL;
+
+int *counts = NULL;
+int *displs = NULL;
 
 int mpi_rank = 0;
 int mpi_size = 1;
@@ -136,20 +138,27 @@ static void write_centroids_csv(const char *path, const double *C, uint32_t K)
 
 static void distribute_points(void)
 {
-    uint32_t points_per_proc = point_amount / (uint32_t) mpi_size;
-    uint32_t remainder = point_amount % (uint32_t) mpi_size;
+    counts = malloc((size_t) mpi_size * sizeof(int));
+    displs = malloc((size_t) mpi_size * sizeof(int));
+    
+    if (!counts || !displs)
+    {
+        perror("malloc counts/displs");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 
-    if ((uint32_t) mpi_rank < remainder)
+    int base = (int) point_amount / mpi_size;
+    int remainder = (int) point_amount % mpi_size;
+    int offset = 0;
+    
+    for (int p = 0; p < mpi_size; p++)
     {
-        local_point_count = points_per_proc + 1;
-        local_point_start = (uint32_t) mpi_rank * local_point_count;
+        counts[p] = base + (p < remainder ? 1 : 0);
+        displs[p] = offset;
+        offset += counts[p];
     }
-    else
-    {
-        local_point_count = points_per_proc;
-        local_point_start = remainder * (points_per_proc + 1) +
-                           ((uint32_t) mpi_rank - remainder) * points_per_proc;
-    }
+    
+    local_point_count = (uint32_t) counts[mpi_rank];
 
     points_local = malloc((size_t) local_point_count * sizeof(float64_t));
     assignments_local = malloc((size_t) local_point_count * sizeof(uint32_t));
@@ -161,32 +170,9 @@ static void distribute_points(void)
     }
 
     double comm_start = MPI_Wtime();
-
-    if (mpi_rank == 0)
-    {
-        // Rank 0 copies its own local part from points_global
-        memcpy(points_local, points_global + local_point_start, (size_t) local_point_count * sizeof(float64_t));
-
-        for (int p = 1; p < mpi_size; p++)
-        {
-            uint32_t p_count;
-            uint32_t p_start_offset;
-
-            if ((uint32_t) p < remainder) {
-                p_count = points_per_proc + 1;
-                p_start_offset = (uint32_t) p * p_count;
-            } else {
-                p_count = points_per_proc;
-                p_start_offset = remainder * (points_per_proc + 1) + ((uint32_t) p - remainder) * points_per_proc;
-            }
-            MPI_Send(&points_global[p_start_offset], (int) p_count, MPI_DOUBLE, p, 0, MPI_COMM_WORLD);
-        }
-    }
-    else
-    {
-        MPI_Recv(points_local, (int) local_point_count, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
-
+    MPI_Scatterv(points_global, counts, displs, MPI_DOUBLE,
+                 points_local, (int) local_point_count, MPI_DOUBLE,
+                 0, MPI_COMM_WORLD);
     comm_time_total += MPI_Wtime() - comm_start;
 }
 
@@ -246,19 +232,30 @@ static void kmeans_mpi(void)
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
+    double comm_start = MPI_Wtime();
+    MPI_Bcast(centroids, (int) centroid_amount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    comm_time_total += MPI_Wtime() - comm_start;
+
     for (iteration_counter = 0; iteration_counter < iteration_limit; iteration_counter++)
     {
-        double comm_start;
-
-        comm_start = MPI_Wtime();
-        MPI_Bcast(centroids, (int) centroid_amount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        comm_time_total += MPI_Wtime() - comm_start;
-
         assignment_step_local(&sse_local);
+        update_step_local();
 
         comm_start = MPI_Wtime();
         MPI_Reduce(&sse_local, &sum_squared_errors, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+        MPI_Allreduce(sum_centroid_points_local, sum_centroid_points_global,
+                     (int) centroid_amount, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(amount_centroid_points_local, amount_centroid_points_global,
+                     (int) centroid_amount, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
         comm_time_total += MPI_Wtime() - comm_start;
+
+        for (uint32_t c = 0; c < centroid_amount; c++)
+        {
+            if (amount_centroid_points_global[c] > 0)
+            {
+                centroids[c] = sum_centroid_points_global[c] / amount_centroid_points_global[c];
+            }
+        }
 
         int converged = 0;
         if (mpi_rank == 0)
@@ -281,23 +278,6 @@ static void kmeans_mpi(void)
             iteration_counter++;
             break;
         }
-
-        update_step_local();
-
-        comm_start = MPI_Wtime();
-        MPI_Allreduce(sum_centroid_points_local, sum_centroid_points_global,
-                     (int) centroid_amount, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Allreduce(amount_centroid_points_local, amount_centroid_points_global,
-                     (int) centroid_amount, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-        comm_time_total += MPI_Wtime() - comm_start;
-
-        for (uint32_t c = 0; c < centroid_amount; c++)
-        {
-            if (amount_centroid_points_global[c] > 0)
-            {
-                centroids[c] = sum_centroid_points_global[c] / amount_centroid_points_global[c];
-            }
-        }
     }
 
     free(sum_centroid_points_local);
@@ -309,35 +289,9 @@ static void kmeans_mpi(void)
 static void gather_assignments(void)
 {
     double comm_start = MPI_Wtime();
-
-    if (mpi_rank == 0)
-    {
-        memcpy(assignments_global, assignments_local, (size_t) local_point_count * sizeof(uint32_t));
-
-        uint32_t points_per_proc = point_amount / (uint32_t) mpi_size;
-        uint32_t remainder = point_amount % (uint32_t) mpi_size;
-
-        for (int p = 1; p < mpi_size; p++)
-        {
-            uint32_t p_count;
-            uint32_t p_start_offset;
-
-            if ((uint32_t) p < remainder) {
-                p_count = points_per_proc + 1;
-                p_start_offset = (uint32_t) p * p_count;
-            } else {
-                p_count = points_per_proc;
-                p_start_offset = remainder * (points_per_proc + 1) + ((uint32_t) p - remainder) * points_per_proc;
-            }
-
-            MPI_Recv(&assignments_global[p_start_offset], (int) p_count, MPI_UNSIGNED, p, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        }
-    }
-    else
-    {
-        MPI_Send(assignments_local, (int) local_point_count, MPI_UNSIGNED, 0, 1, MPI_COMM_WORLD);
-    }
-
+    MPI_Gatherv(assignments_local, (int) local_point_count, MPI_UNSIGNED,
+                assignments_global, counts, displs, MPI_UNSIGNED,
+                0, MPI_COMM_WORLD);
     comm_time_total += MPI_Wtime() - comm_start;
 }
 
@@ -358,7 +312,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Declare and parse arguments for all processes
     const char *path_points_arg = argv[1];
     const char *path_centroids_arg = argv[2];
     iteration_limit = (argc > 3) ? (uint32_t) atoi(argv[3]) : 50u;
@@ -387,7 +340,6 @@ int main(int argc, char **argv)
         }
     }
 
-    // Broadcast global parameters
     MPI_Bcast(&point_amount, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
     MPI_Bcast(&centroid_amount, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
 
@@ -434,6 +386,8 @@ int main(int argc, char **argv)
     free(points_local);
     free(assignments_local);
     free(centroids);
+    free(counts);
+    free(displs);
 
     MPI_Finalize();
     return 0;
